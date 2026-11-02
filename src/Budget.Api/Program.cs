@@ -1,11 +1,20 @@
-using Budget.Api.Domain;
+using Budget.Api.Data;
+using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseSqlite(builder.Configuration.GetConnectionString("BudgetDb")));
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
+
+// Create or upgrade the database at startup
+using (var scope = app.Services.CreateScope())
+{
+    scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.Migrate();
+}
 
 if (app.Environment.IsDevelopment())
 {
