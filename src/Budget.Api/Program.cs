@@ -1,4 +1,6 @@
 using Budget.Api.Data;
+using Budget.Api.Features.Categories;
+using Budget.Api.Features.Expenses;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 
@@ -6,6 +8,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("BudgetDb")));
+builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
@@ -22,6 +25,8 @@ if (app.Environment.IsDevelopment())
     app.MapScalarApiReference();    // /scalar
 }
 
+app.MapCategoryEndpoints();
+app.MapExpenseEndpoints();
 app.MapGet("/health", () => TypedResults.Ok("ok"));
 
 app.Run();
