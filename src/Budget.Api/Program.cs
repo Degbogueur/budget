@@ -1,3 +1,4 @@
+using Budget.Api.Domain;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
