@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Security.Claims;
 using Budget.Api.Data;
 using Budget.Api.Domain;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -8,13 +9,11 @@ namespace Budget.Api.Features.Expenses;
 
 public static class ExpenseEndpoints
 {
-    // Temporary: replaced by the signed-in user in the Identity step
-    private const string DemoUserId = "demo";
-
     public static void MapExpenseEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/expenses")
-            .WithTags("Expenses");
+            .WithTags("Expenses")
+            .RequireAuthorization();
 
         group.MapGet("/", GetExpenses);
         group.MapGet("/summary", GetSummary);
@@ -26,9 +25,9 @@ public static class ExpenseEndpoints
 
     // GET /api/expenses?month=2026-11&categoryId=4
     private static async Task<Ok<List<ExpenseResponse>>> GetExpenses(
-        string? month, int? categoryId, AppDbContext db, TimeProvider clock)
+        string? month, int? categoryId, ClaimsPrincipal user, AppDbContext db, TimeProvider clock)
     {
-        var userId = DemoUserId;
+        var userId = UserId(user);
         var (from, to) = MonthRange(month, clock);
         var query = db.Expenses.AsNoTracking()
             .Where(e => e.UserId == userId && e.Date >= from && e.Date < to);
@@ -46,9 +45,9 @@ public static class ExpenseEndpoints
 
     // GET /api/expenses/summary?month=2026-11
     private static async Task<Ok<MonthSummaryResponse>> GetSummary(
-        string? month, AppDbContext db, TimeProvider clock)
+        string? month, ClaimsPrincipal user, AppDbContext db, TimeProvider clock)
     {
-        var userId = DemoUserId;
+        var userId = UserId(user);
         var (from, to) = MonthRange(month, clock);
 
         // SQLite cannot sum decimals in SQL: load the month's amounts
@@ -69,9 +68,9 @@ public static class ExpenseEndpoints
     }
 
     private static async Task<Results<Ok<ExpenseResponse>, NotFound>> GetExpense(
-        int id, AppDbContext db)
+        int id, ClaimsPrincipal user, AppDbContext db)
     {
-        var userId = DemoUserId;
+        var userId = UserId(user);
         var expense = await db.Expenses.AsNoTracking()
             .Where(e => e.Id == id && e.UserId == userId)
             .Select(e => new ExpenseResponse(e.Id, e.Description, e.Amount, e.CategoryId, e.Category.Name, e.Date))
@@ -81,9 +80,9 @@ public static class ExpenseEndpoints
     }
 
     private static async Task<Created<ExpenseResponse>> CreateExpense(
-        SaveExpenseRequest request, AppDbContext db, TimeProvider clock)
+        SaveExpenseRequest request, ClaimsPrincipal user, AppDbContext db, TimeProvider clock)
     {
-        var userId = DemoUserId;
+        var userId = UserId(user);
         var today = Today(clock);
         var category = await FindCategory(db, request.CategoryId, userId);
         var expense = Expense.Create(userId, request.Description, request.Amount, category, request.Date ?? today, today);
@@ -96,9 +95,9 @@ public static class ExpenseEndpoints
     }
 
     private static async Task<Results<NoContent, NotFound>> UpdateExpense(
-        int id, SaveExpenseRequest request, AppDbContext db, TimeProvider clock)
+        int id, SaveExpenseRequest request, ClaimsPrincipal user, AppDbContext db, TimeProvider clock)
     {
-        var userId = DemoUserId;
+        var userId = UserId(user);
         var expense = await db.Expenses.FirstOrDefaultAsync(e => e.Id == id && e.UserId == userId);
         if (expense is null) return TypedResults.NotFound();
 
@@ -110,9 +109,9 @@ public static class ExpenseEndpoints
     }
 
     private static async Task<Results<NoContent, NotFound>> DeleteExpense(
-        int id, AppDbContext db)
+        int id, ClaimsPrincipal user, AppDbContext db)
     {
-        var userId = DemoUserId;
+        var userId = UserId(user);
         var deleted = await db.Expenses
             .Where(e => e.Id == id && e.UserId == userId)
             .ExecuteDeleteAsync();
@@ -124,6 +123,9 @@ public static class ExpenseEndpoints
     private static async Task<Category> FindCategory(AppDbContext db, int categoryId, string userId) =>
         await db.Categories.FirstOrDefaultAsync(c => c.Id == categoryId && (c.UserId == null || c.UserId == userId))
         ?? throw new DomainException(nameof(Expense.CategoryId), "Unknown category.");
+
+    private static string UserId(ClaimsPrincipal user) =>
+        user.FindFirstValue(ClaimTypes.NameIdentifier)!;
 
     private static DateOnly Today(TimeProvider clock) =>
         DateOnly.FromDateTime(clock.GetLocalNow().DateTime);

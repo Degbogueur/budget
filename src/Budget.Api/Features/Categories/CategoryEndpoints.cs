@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Budget.Api.Data;
 using Budget.Api.Domain;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -11,22 +12,20 @@ public record CreateCategoryRequest(string? Name);
 
 public static class CategoryEndpoints
 {
-    // Temporary: replaced by the signed-in user in the Identity step
-    private const string DemoUserId = "demo";
-
     public static void MapCategoryEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/categories")
-            .WithTags("Categories");
+            .WithTags("Categories")
+            .RequireAuthorization();
 
         group.MapGet("/", GetCategories);
         group.MapPost("/", CreateCategory);
     }
 
     // Built-in categories first, then the user's own, alphabetically
-    private static async Task<Ok<List<CategoryResponse>>> GetCategories(AppDbContext db)
+    private static async Task<Ok<List<CategoryResponse>>> GetCategories(ClaimsPrincipal user, AppDbContext db)
     {
-        var userId = DemoUserId;
+        var userId = user.FindFirstValue(ClaimTypes.NameIdentifier)!;
         var items = await db.Categories.AsNoTracking()
             .Where(c => c.UserId == null || c.UserId == userId)
             .OrderBy(c => c.UserId != null).ThenBy(c => c.Name)
@@ -37,9 +36,9 @@ public static class CategoryEndpoints
     }
 
     private static async Task<Created<CategoryResponse>> CreateCategory(
-        CreateCategoryRequest request, AppDbContext db)
+        CreateCategoryRequest request, ClaimsPrincipal user, AppDbContext db)
     {
-        var userId = DemoUserId;
+        var userId = user.FindFirstValue(ClaimTypes.NameIdentifier)!;
         var category = Category.CreateCustom(userId, request.Name);
 
         // Uniqueness needs the database, so it is checked here rather than in the entity
