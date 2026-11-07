@@ -19,5 +19,3 @@ export function today(): string {
   const now = new Date()
   return `${currentMonth()}-${String(now.getDate()).padStart(2, '0')}`
 }
-
-export const CATEGORIES = ['Food', 'Housing', 'Transport', 'Other']

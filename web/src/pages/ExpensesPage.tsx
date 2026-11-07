@@ -1,43 +1,45 @@
+import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
-import type { Expense } from '../api/expenses'
+import { categoriesQuery } from '../api/categories'
+import { expenseQueries } from '../api/expenses'
 import { ExpenseList } from '../components/ExpenseList'
-import { CATEGORIES, formatMoney } from '../lib/format'
-
-const SAMPLE: Expense[] = [
-  { id: 1, description: 'Save-On-Foods groceries', amount: 86.4, category: 'Food', date: '2026-11-02' },
-  { id: 2, description: 'November rent', amount: 1450, category: 'Housing', date: '2026-11-01' },
-  { id: 3, description: 'ETS bus pass', amount: 100, category: 'Transport', date: '2026-11-01' },
-  { id: 4, description: 'Remedy coffee', amount: 6.25, category: 'Food', date: '2026-11-03' },
-]
+import { MonthSummary } from '../components/MonthSummary'
+import { currentMonth } from '../lib/format'
 
 export function ExpensesPage() {
-  const [expenses, setExpenses] = useState(SAMPLE)
-  const [category, setCategory] = useState('')
+  const [month, setMonth] = useState(currentMonth())
+  const [categoryId, setCategoryId] = useState('')
 
-  // Derived values: recomputed on every render, never stored in state
-  const visible = category ? expenses.filter((e) => e.category === category) : expenses
-  const total = visible.reduce((sum, e) => sum + e.amount, 0)
-
-  function handleDelete(id: number) {
-    setExpenses(expenses.filter((e) => e.id !== id)) // new array, never splice
-  }
+  const list = useQuery(expenseQueries.list(month, categoryId))
+  const summary = useQuery(expenseQueries.summary(month))
+  const { data: categories = [] } = useQuery(categoriesQuery)
 
   return (
-    <section className="space-y-4">
-      <div className="flex flex-wrap items-end gap-3">
-        <h1 className="mr-auto text-2xl font-bold text-slate-900">My expenses</h1>
-        <label className="text-sm">
-          <span className="block text-slate-500">Category</span>
-          <select value={category} onChange={(e) => setCategory(e.target.value)} className="rounded-md border border-slate-300 px-2 py-1">
-            <option value="">All</option>
-            {CATEGORIES.map((c) => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
-        </label>
-      </div>
-      <p className="text-lg">Total: <strong className="tabular-nums">{formatMoney(total)}</strong></p>
-      <ExpenseList expenses={visible} onDelete={handleDelete} />
-    </section>
+    <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+      <section className="min-w-0 space-y-4">
+        <div className="flex flex-wrap items-end gap-3">
+          <h1 className="mr-auto text-2xl font-bold text-slate-900">My expenses</h1>
+          <label className="text-sm">
+            <span className="block text-slate-500">Month</span>
+            <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="rounded-md border border-slate-300 px-2 py-1" />
+          </label>
+          <label className="text-sm">
+            <span className="block text-slate-500">Category</span>
+            <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="rounded-md border border-slate-300 px-2 py-1">
+              <option value="">All</option>
+              {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </label>
+        </div>
+
+        {list.isPending && <p className="text-slate-500">Loading…</p>}
+        {list.isError && <p role="alert" className="text-red-600">Could not load expenses.</p>}
+        {list.data && <ExpenseList expenses={list.data} />}
+      </section>
+
+      <aside className="space-y-6">
+        {summary.data && <MonthSummary summary={summary.data} />}
+      </aside>
+    </div>
   )
 }
