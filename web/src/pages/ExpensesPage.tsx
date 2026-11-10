@@ -1,7 +1,8 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { categoriesQuery } from '../api/categories'
-import { expenseQueries } from '../api/expenses'
+import { deleteExpense, expenseQueries } from '../api/expenses'
+import { ExpenseForm } from '../components/ExpenseForm'
 import { ExpenseList } from '../components/ExpenseList'
 import { MonthSummary } from '../components/MonthSummary'
 import { currentMonth } from '../lib/format'
@@ -9,10 +10,16 @@ import { currentMonth } from '../lib/format'
 export function ExpensesPage() {
   const [month, setMonth] = useState(currentMonth())
   const [categoryId, setCategoryId] = useState('')
+  const queryClient = useQueryClient()
 
   const list = useQuery(expenseQueries.list(month, categoryId))
   const summary = useQuery(expenseQueries.summary(month))
   const { data: categories = [] } = useQuery(categoriesQuery)
+
+  const remove = useMutation({
+    mutationFn: deleteExpense,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['expenses'] }),
+  })
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
@@ -34,11 +41,18 @@ export function ExpensesPage() {
 
         {list.isPending && <p className="text-slate-500">Loading…</p>}
         {list.isError && <p role="alert" className="text-red-600">Could not load expenses.</p>}
-        {list.data && <ExpenseList expenses={list.data} />}
+        {list.data && (
+          <ExpenseList
+            expenses={list.data}
+            onDelete={(id) => remove.mutate(id)}
+            deletingId={remove.isPending ? remove.variables : null}
+          />
+        )}
       </section>
 
       <aside className="space-y-6">
         {summary.data && <MonthSummary summary={summary.data} />}
+        <ExpenseForm />
       </aside>
     </div>
   )

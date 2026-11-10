@@ -41,3 +41,11 @@ export const expenseQueries = {
       queryFn: () => http<MonthSummary>(`/api/expenses/summary?month=${month}`),
     }),
 }
+
+export function createExpense(body: SaveExpense) {
+  return http<Expense>('/api/expenses', { method: 'POST', body: JSON.stringify(body) })
+}
+
+export function deleteExpense(id: number) {
+  return http<void>(`/api/expenses/${id}`, { method: 'DELETE' })
+}
