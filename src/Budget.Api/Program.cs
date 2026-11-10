@@ -37,6 +37,9 @@ if (app.Environment.IsDevelopment())
     app.MapScalarApiReference();
 }
 
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -44,6 +47,8 @@ app.MapAuthEndpoints();
 app.MapCategoryEndpoints();
 app.MapExpenseEndpoints();
 app.MapGet("/health", () => TypedResults.Ok("ok"));
+
+app.MapFallbackToFile("index.html");
 
 app.Run();
 
